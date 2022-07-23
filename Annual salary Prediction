@@ -1,0 +1,171 @@
+// Q1 - Data Inspection & Descriptive Analysis
+browse
+describe
+
+// Encode the variables
+encode Country, generate(country_dum)
+encode company, generate(company_dum)
+encode title, generate(title_dum)
+encode sector, generate(sector_dum)
+gen log_bonus = ln(bonus) 
+gen log_annualsalary = ln( annualsalary)
+encode gender , generate(genderdum)
+encode seniority_level , generate(senioritylevel_dum)
+
+// Two-way table
+tabstat annualsalary totalexperience currentexperience bonus country_dum sector_dum year company_dum gender_dum , by(seniority_level)
+
+//Correlation Matrix
+pwcorr id year seniority_level annualsalary totalexperience currentexperience bonus 
+graph matrix id year seniority_level annualsalary totalexperience currentexperience bonus 
+
+//One-way Anova
+oneway log_annualsalary year , tabulate
+histogram log_annualsalary
+hist log_annualsalary, by(year)
+graph bar (mean) log_annualsalary, over(year)
+graph bar (mean) log_annualsalary, over(year) asyvar
+
+// Part - 2 
+oneway log_bonus year, tabulate
+histogram log_bonus
+hist log_bonus
+graph bar (mean) log_bonus, over(year)
+graph bar (mean) log_bonus, over(year) asyvar
+
+// Gender vs Annual salary plot
+oneway log_annualsalary gender_dum , tabulate
+hist log_annualsalary, by(gender_dum)
+graph bar (mean) log_annualsalary, over(gender_dum)
+graph bar (mean) log_annualsalary, over(gender_dum) asyvar
+
+// Oneway graph for seniority level vs log(annual salary)
+oneway log_bonus seniority_level_dum , tabulate
+graph box log_annualsalary , over(seniority_level_dum)
+
+// Q2 - Exploratory Analysis
+// Annual salary & seniority level relationship
+graph hbar (mean) annualsalary (median) annualsalary (sd) annualsalary , over(seniority_level) name(annual_salary)
+
+// Year & Seniorty_level relationship
+graph hbar (mean) year (median) year (sd) year , over( seniority_level ) name(year_seniority)
+
+// bonus & seniority_level relationship
+graph hbar (mean) bonus (median) bonus (sd) bonus , over( seniority_level ) name(bonus_senioritylevel)
+
+// totalexperience  & seniority_level relationship
+graph hbar (mean) totalexperience (median) totalexperience (sd) totalexperience , over( seniority_level ) name(totalworkexperience_senioritylevel)
+
+// workexperience & seniority_level relationship
+graph hbar (mean) currentexperience (median) currentexperience (sd) currentexperience , over( seniority_level ) name(currentwork_seniorityleel)
+
+// Graph plot of annual salary over seniority level
+graph box annualsalary , over ( seniority_level ) title (Statistical Test Graph over Year Category) 
+
+// Graph plot of annual salary over year
+graph box annualsalary , over (year) title (Statistical Box Graph over Year)
+
+// Dsitribution Calculation
+histogram annualsalary , normal name(Annual__)
+histogram totalexperience , normal name(Total_WE)
+histogram currentexperience , normal name(Current_WE)
+histogram bonus , normal name(Bonus)
+graph combine as twe cwe bonus
+
+// Outliers
+graph hbox annualsalary totalexperience currentexperience bonus year id
+graph hbox totalexperience currentexperience
+graph hbox annualsalary bonus year id
+
+// Relationship b/w deopendent & independent variables
+twoway (scatter annualsalary totalexperience , mcolor(maroon) msymbol(triangle)) (lfit annualsalary totalexperience)
+twoway (scatter annualsalary currentexperience , mcolor(red) msymbol(triangle)) (lfit annualsalary currentexperience)
+twoway (scatter annualsalary bonus , mcolor(yellow) msymbol(triangle)) (lfit annualsalary bonus)
+
+// Trend Lines
+twoway (lfit bonus year ), ytitle( bonus ) name(bonus)
+twoway (lfit annualsalary year ), ytitle( annualsalary ) name(Annualsalary_Year)
+twoway (lfit annualsalary bonus ), ytitle( annualsalary ) name(AnnualSalary_Bonus)
+graph combine bonus Annualsalary_Year AnnualSalary_Bonus
+
+// Creating 'status' variable 
+bysort year id: egen status= sum(bonus)
+
+// Creating status_id & setting values
+gen status_value = 1 if status>=2000
+replace status_value = 0 if status<=2000
+
+// plotting graph for average of annual_salary & status_id
+graph hbar (mean) annualsalary , over(status_value) name(status value)
+
+//--(3) Main Regression Analysis
+// Generate log of variables
+
+eststo clear
+reg log_annualsalary log_bonus totalexperience currentexperience i.genderdum i.senioritylevel_dum
+eststo bmd
+reg log_annualsalary log_bonus totalexperience currentexperience i.genderdum i.senioritylevel_dum if gender == "Male"
+eststo lmd
+reg log_annualsalary log_bonus totalexperience currentexperience i.genderdum i.senioritylevel_dum if gender == "Female"
+eststo nlmd
+esttab bmd lmd nlmd using OLS_reg.csv, replace ar2(3) b(3) se(3) r2(3) label compress title (Model Comparison) mtitles("OLS Baseline Model" "Male" "Female") 
+
+// Margins plot for male & female 
+reg log_annualsalary log_bonus totalexperience currentexperience i.genderdum i.senioritylevel_dum
+margins genderdum
+marginsplot, recast(line) recastci(rarea)
+esttab using OLLShgha_reg.csv
+
+// Interaction Part
+// We have excluded total & current work experience as we are using it in interaction
+reg log_annualsalary log_bonus i.genderdum i.senioritylevel_dum i.genderdum##c.totalexperience c.currentexperience##i.senioritylevel_dum
+
+
+// Robust and Diagnostic Analysis
+// Part 1
+//Robustness check
+//Multicollinearity
+
+reg log_annualsalary log_bonus totalexperience currentexperience i.genderdum i.senioritylevel_dum
+vif
+
+// To export Results in CSV file
+esttab using MultiCLty_reg.csv
+
+//Heteroskedasticity
+reg log_salary log_bonus totalexperience currentexperience i.gender_dum i.senior_dum
+
+predict fitted
+predict resid, residual
+twoway (scatter resid  fitted), yline(0)
+drop fitted resid
+
+//detection
+hettest
+imtest, white
+
+reg log_salary log_bonus totalexperience currentexperience i.gender_dum i.senior_dum, vce(robust)
+ 
+// Part 3
+// 6 is the number of variables and 1746 observations totally.
+// Predicting leverage and leverage cutoff
+reg log_annualsalary log_bonus totalexperience currentexperience i.genderdum i.senioritylevel_dum
+predict lev, leverage
+gen lev_cutoff=(2*12+2)/1746
+browse id lev lev_cutoff if lev>lev_cutoff
+gsort -lev
+
+//Influential Observations with cook and cook cut off method
+reg log_annualsalary log_bonus totalexperience currentexperience i.genderdum i.senioritylevel_dum
+predict cook, cooksd
+gen cook_cutoff=4/1289
+browse log_annualsalary cook cook_cutoff if cook>cook_cutoff & !missing(cook)
+gsort -cook
+
+
+
+
+
+
+
+
